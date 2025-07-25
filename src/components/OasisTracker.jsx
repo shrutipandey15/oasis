@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import DaySelector from "./DaySelector";
 import TaskList from "./TaskList";
 import BottomPanel from "./BottomPanel";
+import Garden from "./Garden";
 
 const tasks = [
   {
@@ -222,7 +223,7 @@ export default function OasisTracker() {
         getCompletionPercentage={getCompletionPercentage}
       />
 
-      <TaskList
+      {/* <TaskList
         weekData={weekData}
         dayIndex={dayIndex}
         getDailyTasks={getDailyTasks}
@@ -231,7 +232,8 @@ export default function OasisTracker() {
         showRandomReminder={showRandomReminder}
         countCompleted={countCompleted}
         getTotalTasks={getTotalTasks}
-      />
+      /> */}
+<Garden tasks={tasks} />
 
       <BottomPanel
         countCompleted={countCompleted}
