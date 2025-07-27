@@ -1,14 +1,16 @@
 import { useState, useEffect } from "react";
 import DaySelector from "./DaySelector";
-import TaskList from "./TaskList";
 import BottomPanel from "./BottomPanel";
 import Garden from "./Garden";
+import AddHabitModal from "./AddHabitModal";
+import useLocalStorageState from "~/hooks/useLocalStorageState";
 
-const tasks = [
+const initialTasks = [
   {
     id: "water",
     name: "Drank water 💧",
     frequency: "daily",
+    completed: {},
     reminders: [
       "Hey cutie patootie, did you drink water today? 💧",
       "Your body is basically a houseplant with anxiety - WATER IT! 🌱",
@@ -20,6 +22,7 @@ const tasks = [
     id: "meal",
     name: "Ate a meal 🍽️",
     frequency: "daily",
+    completed: {},
     reminders: [
       "Did you eat, you adorable human? Food is fuel! 🍽️",
       "Your stomach is sending angry notifications - FEED IT! 🥪",
@@ -31,6 +34,7 @@ const tasks = [
     id: "interview",
     name: "Interview prep 💼",
     frequency: "weekly",
+    completed: {},
     reminders: [
       "Future CEO, time for some interview prep! 💼",
       "Practice makes perfect (or at least less awkward)! 🎭",
@@ -42,6 +46,7 @@ const tasks = [
     id: "gym",
     name: "Gym or movement 🏋️",
     frequency: "daily",
+    completed: {},
     reminders: [
       "Time to build those biceps, gorgeous! 💪",
       "Your future hot self is waiting at the gym! 🔥",
@@ -53,6 +58,7 @@ const tasks = [
     id: "project",
     name: "Worked on side project 💡",
     frequency: "weekly",
+    completed: {},
     reminders: [
       "Your side project misses you, creative genius! 💡",
       "Building the future, one line of code at a time! 🚀",
@@ -64,6 +70,7 @@ const tasks = [
     id: "writing",
     name: "Wrote something ✍️",
     frequency: "weekly",
+    completed: {},
     reminders: [
       "Turn your brain chaos into beautiful words! ✍️",
       "Your thoughts deserve to exist outside your head! 📝",
@@ -75,6 +82,7 @@ const tasks = [
     id: "linkedin",
     name: "Posted on LinkedIn 🌐",
     frequency: "weekly",
+    completed: {},
     reminders: [
       "Time to professionally humble-brag, networking ninja! 🌐",
       "LinkedIn is calling - answer with your brilliance! 💼",
@@ -86,6 +94,7 @@ const tasks = [
     id: "reading",
     name: "Read something 📚",
     frequency: "weekly",
+    completed: {},
     reminders: [
       "Feed your beautiful brain some knowledge! 📚",
       "Reading makes you 37% more interesting (I made that up)! 🤓",
@@ -97,6 +106,7 @@ const tasks = [
     id: "checkin",
     name: "Checked in with myself 🪞",
     frequency: "daily",
+    completed: {},
     reminders: [
       "Hey beautiful soul, how are you really doing? 🪞",
       "Your feelings are valid - check in with them! 💭",
@@ -109,38 +119,82 @@ const tasks = [
 const weekdays = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
 export default function OasisTracker() {
-  const [weekData, setWeekData] = useState(() =>
-    Array(7)
-      .fill()
-      .map(() =>
-        tasks.reduce((acc, task) => ({ ...acc, [task.id]: false }), {})
-      )
-  );
+  const [tasks, setTasks] = useLocalStorageState("tasks", initialTasks);
 
   const [dayIndex, setDayIndex] = useState(() => {
     const today = new Date().getDay();
     return today === 0 ? 6 : today - 1;
   });
 
-  const [showReminder, setShowReminder] = useState(null);
-  const [reminderTimeout, setReminderTimeout] = useState(null);
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
   useEffect(() => {}, [dayIndex]);
 
+  const getDateStringForDayIndex = (dayIndex) => {
+    const today = new Date();
+    const currentDayOfWeek = today.getDay();
+    const targetDayOfWeek = dayIndex + 1;
+
+    let dayDifference =
+      targetDayOfWeek - (currentDayOfWeek === 0 ? 7 : currentDayOfWeek);
+
+    const targetDate = new Date();
+    targetDate.setDate(today.getDate() + dayDifference);
+
+    return targetDate.toISOString().split("T")[0];
+  };
+
   const toggleTask = (taskId) => {
-    const updated = [...weekData];
-    if (!updated[dayIndex]) updated[dayIndex] = {};
-    updated[dayIndex][taskId] = !updated[dayIndex][taskId];
-    setWeekData(updated);
+    const dateString = getDateStringForDayIndex(dayIndex);
+
+    setTasks((currentTasks) => {
+      return currentTasks.map((task) => {
+        if (task.id === taskId) {
+          const newCompleted = { ...task.completed };
+
+          if (newCompleted[dateString]) {
+            delete newCompleted[dateString];
+          } else {
+            newCompleted[dateString] = true;
+          }
+          return { ...task, completed: newCompleted };
+        }
+        return task;
+      });
+    });
   };
 
   const resetToday = () => {
-    const updated = [...weekData];
-    updated[dayIndex] = tasks.reduce(
-      (acc, task) => ({ ...acc, [task.id]: false }),
-      {}
+    const dateString = getDateStringForDayIndex(dayIndex);
+
+    setTasks((currentTasks) =>
+      currentTasks.map((task) => {
+        const newCompleted = { ...task.completed };
+
+        if (newCompleted[dateString]) {
+          delete newCompleted[dateString];
+        }
+
+        return { ...task, completed: newCompleted };
+      })
     );
-    setWeekData(updated);
+  };
+
+  const addTask = (newHabit) => {
+    const newTask = {
+      id: newHabit.name.toLowerCase().replace(/\s/g, "-") + Date.now(),
+      name: newHabit.name,
+      frequency: newHabit.frequency,
+      reminders: ["Don't forget to do your new habit!"],
+    };
+    setTasks([...tasks, newTask]);
+  };
+
+  const deleteTask = (taskId) => {
+    if (window.confirm("Are you sure you want to delete this habit?")) {
+      setTasks(tasks.filter((task) => task.id !== taskId));
+    }
   };
 
   const getDailyTasks = () =>
@@ -149,31 +203,72 @@ export default function OasisTracker() {
     tasks.filter((task) => task.frequency === "weekly");
 
   const countCompleted = (day, taskType = "all") => {
-    const dayData = weekData[day];
-    if (!dayData) return 0;
-
+    const dateString = getDateStringForDayIndex(day);
+    let tasksToCount = tasks;
     if (taskType === "daily") {
-      return getDailyTasks().filter((task) => dayData[task.id]).length;
+      tasksToCount = getDailyTasks();
     } else if (taskType === "weekly") {
-      return getWeeklyTasks().filter((task) => dayData[task.id]).length;
+      tasksToCount = getWeeklyTasks();
     }
-    return Object.values(dayData).filter(Boolean).length;
+    return tasksToCount.filter((task) => task.completed?.[dateString]).length;
+  };
+
+  const calculateStreak = (task) => {
+    const { completed, frequency } = task;
+    if (!completed) return 0;
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    let streak = 0;
+
+    if (frequency === "daily") {
+      for (let i = 0; i < 365; i++) {
+        const checkDate = new Date(today);
+        checkDate.setDate(today.getDate() - i);
+        const dateStr = checkDate.toISOString().split("T")[0];
+
+        if (completed[dateStr]) {
+          streak++;
+        } else {
+          break;
+        }
+      }
+    } else if (frequency === "weekly") {
+      for (let i = 0; i < 52; i++) {
+        const weekEnd = new Date(today);
+        weekEnd.setDate(today.getDate() - i * 7);
+
+        const weekStart = new Date(weekEnd);
+        weekStart.setDate(weekEnd.getDate() - 6);
+
+        let completedThisWeek = false;
+        for (let j = 0; j < 7; j++) {
+          const checkDate = new Date(weekStart);
+          checkDate.setDate(weekStart.getDate() + j);
+          const dateStr = checkDate.toISOString().split("T")[0];
+
+          if (completed[dateStr]) {
+            completedThisWeek = true;
+            break;
+          }
+        }
+
+        if (completedThisWeek) {
+          streak++;
+        } else {
+          break;
+        }
+      }
+    }
+
+    return streak;
   };
 
   const getTotalTasks = (taskType = "all") => {
     if (taskType === "daily") return getDailyTasks().length;
     if (taskType === "weekly") return getWeeklyTasks().length;
     return tasks.length;
-  };
-
-  const showRandomReminder = (task) => {
-    const randomReminder =
-      task.reminders[Math.floor(Math.random() * task.reminders.length)];
-    setShowReminder({ task: task.name, message: randomReminder });
-
-    if (reminderTimeout) clearTimeout(reminderTimeout);
-    const timeout = setTimeout(() => setShowReminder(null), 4000);
-    setReminderTimeout(timeout);
   };
 
   const getCompletionPercentage = (day) => {
@@ -183,68 +278,54 @@ export default function OasisTracker() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-50 via-pink-50 to-blue-50 overflow-hidden">
-      <div className="h-12 bg-transparent"></div>
-
-      {showReminder && (
-        <div className="fixed top-20 left-4 right-4 z-50 animate-in slide-in-from-top duration-300">
-          <div className="bg-gradient-to-r from-purple-500 to-pink-500 text-white p-4 rounded-2xl shadow-xl border border-white/20">
-            <div className="text-sm font-medium opacity-90 mb-1">
-              {showReminder.task}
-            </div>
-            <div className="text-base">{showReminder.message}</div>
-            <button
-              onClick={() => setShowReminder(null)}
-              className="absolute top-2 right-3 text-white/80 hover:text-white text-lg"
-            >
-              ×
-            </button>
+    <div className="bg-gradient-to-br from-purple-50 via-pink-50 to-blue-50">
+      <div className="pb-40">
+        <div className="h-12 bg-transparent" />
+        <div className="px-6 pb-4">
+          <div className="text-center">
+            <h1 className="text-2xl font-bold text-purple-800 mb-2">
+              🌸 Soft Tracker
+            </h1>
+            <p className="text-sm text-purple-600 opacity-80">
+              Your gentle daily companion
+            </p>
           </div>
         </div>
-      )}
 
-      <div className="px-6 pb-4">
-        <div className="text-center">
-          <h1 className="text-2xl font-bold text-purple-800 mb-2">
-            🌸 Soft Tracker
-          </h1>
-          <p className="text-sm text-purple-600 opacity-80">
-            Your gentle daily companion
-          </p>
-        </div>
+        <DaySelector
+          weekdays={weekdays}
+          dayIndex={dayIndex}
+          setDayIndex={setDayIndex}
+          countCompleted={countCompleted}
+          tasks={tasks}
+          getCompletionPercentage={getCompletionPercentage}
+        />
+
+        <Garden
+          tasks={tasks}
+          dayIndex={dayIndex}
+          toggleTask={toggleTask}
+          getDateStringForDayIndex={getDateStringForDayIndex}
+          isEditMode={isEditMode}
+          deleteTask={deleteTask}
+          calculateStreak={calculateStreak}
+        />
       </div>
-
-      <DaySelector
-        weekdays={weekdays}
-        dayIndex={dayIndex}
-        setDayIndex={setDayIndex}
-        countCompleted={countCompleted}
-        tasks={tasks}
-        getCompletionPercentage={getCompletionPercentage}
+      <AddHabitModal
+        isOpen={isModalOpen}
+        setIsOpen={setIsModalOpen}
+        addTask={addTask}
       />
-
-      {/* <TaskList
-        weekData={weekData}
-        dayIndex={dayIndex}
-        getDailyTasks={getDailyTasks}
-        getWeeklyTasks={getWeeklyTasks}
-        toggleTask={toggleTask}
-        showRandomReminder={showRandomReminder}
-        countCompleted={countCompleted}
-        getTotalTasks={getTotalTasks}
-      /> */}
-<Garden tasks={tasks} />
 
       <BottomPanel
         countCompleted={countCompleted}
         dayIndex={dayIndex}
         getTotalTasks={getTotalTasks}
         resetToday={resetToday}
+        setIsModalOpen={setIsModalOpen}
+        isEditMode={isEditMode}
+        setIsEditMode={setIsEditMode}
       />
-
-      <div className="fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-xl border-t border-gray-200/50">
-        <div className="px-6 py-4 pb-8"></div>
-      </div>
     </div>
   );
 }
